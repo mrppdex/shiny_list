@@ -1,110 +1,66 @@
-# comment
-
 library(shiny)
 
 item_UI <- function(id) {
   ns <- NS(id)
-  tagList(
-    tags$head(tags$script(HTML("
-    $(document).on('keypress', 'input[id$=item_input]', function (e) {
-        console.log(e.which);
-        if (e.which == 13) {
-            console.log('Enter pressed...');
-            e.preventDefault();
-            var $button = $('html').find('button[id$=add_button]');
-            if ($button.length) {
-                console.log('Button found, about to programmatically click the button...');
-                $button.click();
-            } else {
-                console.log('Button not found');
-            }
-        }
-    })
-    "))),
-    textInput(ns("item_input"), "Item:"),
-    actionButton(ns("add_button"), "Add item"),
-    actionButton(ns("insert_above_button"), "Insert item above"),
-    actionButton(ns("insert_below_button"), "Insert item below"),
-    actionButton(ns("remove_button"), "Remove item"),
-    downloadButton(ns("downloadData"), "Export to CSV"),
-    tags$hr(),
-    uiOutput(ns("item_list"))
+  div(
+    id = id,
+    div(
+      id = ns("item_container"),
+      style = "border: 1px solid; border-radius: 10px; background-color: #800080; padding: 10px; margin: 10px;", # purple fill, rounded corners
+      tagList(
+        div(
+          style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;", # flex container for arranging inputs in a row
+          tags$input(id = ns("item_input"), type = "text", class = "form-control", 
+                     placeholder = "Enter item here", 
+                     style = "background-color: #FFFF00; color: #006400; width: 100%;") # yellow fill, dark green text
+        ),
+        div(
+          style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;", # flex container for arranging inputs in a row
+          tags$input(id = ns("estimate_input"), type = "text", class = "form-control", 
+                     placeholder = "Enter estimate here", 
+                     style = "background-color: #FFFF00; color: #006400; width: 33.33%;"), # yellow fill, dark green text
+          tags$input(id = ns("lower_bound_input"), type = "text", class = "form-control", 
+                     placeholder = "Enter lower bound here", 
+                     style = "background-color: #FFFF00; color: #006400; width: 33.33%;"), # yellow fill, dark green text
+          tags$input(id = ns("upper_bound_input"), type = "text", class = "form-control", 
+                     placeholder = "Enter upper bound here", 
+                     style = "background-color: #FFFF00; color: #006400; width: 33.33%;") # yellow fill, dark green text
+        ),
+        div(
+          style = "display: flex; justify-content: flex-start; align-items: center; margin-bottom: 10px;", # flex container for arranging buttons in a row
+          actionButton(ns("insert_above_button"), "Insert item above"),
+          actionButton(ns("insert_below_button"), "Insert item below")
+        ),
+        tags$hr()
+      )
+    )
   )
 }
 
 
-item_Server <- function(id) {
+
+
+
+# Module Server
+item_Server <- function(id, data) {
   moduleServer(
     id,
     function(input, output, session) {
-      items <- reactiveVal(list())
-      
-      observeEvent(input$add_button, {
-        if (input$item_input!="") {
-          items(c(items(), input$item_input))
-          updateTextInput(session, "item_input", value = "")
-          updateRadioButtons(session, "radio_button", selected = length(items())) 
-        }
-      })
-      
       observeEvent(input$insert_above_button, {
-        if (input$item_input=="" | length(items())==0) return()
-        sel <- as.numeric(input$radio_button)
-        if (is.null(sel)) {
-          items(c(input$item_input, items()))
-        } else if (sel == 1) {
-          items(c(input$item_input, items()))
-        } else {
-          items(c(items()[1:(sel-1)], input$item_input, items()[sel:length(items())]))
-        }
-        updateTextInput(session, "item_input", value = "")
-        updateRadioButtons(session, "radio_button", selected = sel)
+        data$insertAbove(id)
       })
-      
-      
       observeEvent(input$insert_below_button, {
-        sel <- as.numeric(input$radio_button)
-        if (input$item_input=="" | length(items())==0) return()
-        if (is.null(sel)) {
-          items(c(items(), input$item_input))
-        } else {
-          if (sel == length(items())) {
-            items(c(items(), input$item_input))
-          } else {
-            items(c(items()[1:sel], input$item_input, items()[(sel+1):length(items())]))
-          }
-        }
-        updateTextInput(session, "item_input", value = "")
-        updateRadioButtons(session, "radio_button", selected = sel + 1)
+        data$insertBelow(id)
       })
       
-      observeEvent(input$remove_button, {
-        sel <- as.numeric(input$radio_button)
-        if (!is.null(sel)) {
-          items(items()[-sel])
-        }
-        updateTextInput(session, "item_input", value = "")
+      observe({
+        data$values[[id]] <<- list(
+          Text = input$item_input,
+          Estimate = input$estimate_input,
+          Lower = input$lower_bound_input,
+          Upper = input$upper_bound_input
+        )
       })
-      
-      output$item_list <- renderUI({
-        itemList <- items()
-        if (length(itemList) > 0) {
-          choices = setNames(as.list(seq_along(itemList)), itemList)
-          div(
-            radioButtons(session$ns("radio_button"), NULL, choices = choices, selected = NULL)
-          )
-        }
-      })
-      
-      output$downloadData <- downloadHandler(
-        filename = function() {
-          paste(id, ".csv", sep = "")
-        },
-        content = function(file) {
-          df <- data.frame(Item = unlist(items()))
-          write.csv(df, file, row.names = FALSE)
-        }
-      )
     }
   )
 }
@@ -113,11 +69,76 @@ item_Server <- function(id) {
 
 
 ui <- fluidPage(
-  item_UI("item1")
+  actionButton("add_button", "Add item"),
+  tags$div(id = "placeholder"),
+  downloadButton("downloadData", "Save to CSV")  # Add the 'Save to CSV' button here
 )
 
 server <- function(input, output, session) {
-  item_Server("item1")
+  data <- reactiveValues(ids = character(0), values = list())
+  counter <- reactiveVal(0)
+  
+  data$add <- function() {
+    counter(counter() + 1)
+    id <- paste0("item", counter())
+    data$ids <- c(data$ids, id)
+    insertUI(
+      selector = "#placeholder",
+      ui = item_UI(id),
+      where = "beforeBegin"
+    )
+    item_Server(id, data)
+  }
+  
+  data$insertAbove <- function(id) {
+    counter(counter() + 1)
+    idx <- match(id, data$ids)
+    if (is.na(idx)) {
+      stop("Invalid id: ", id)
+    }
+    newId <- paste0("item", counter())
+    data$ids <- append(data$ids, newId, after = idx - 1)
+    insertUI(
+      selector = paste0("#", id),
+      ui = item_UI(newId),
+      where = "beforeBegin"
+    )
+    item_Server(newId, data)
+  }
+  
+  data$insertBelow <- function(id) {
+    counter(counter() + 1)
+    idx <- match(id, data$ids)
+    if (is.na(idx)) {
+      stop("Invalid id: ", id)
+    }
+    newId <- paste0("item", counter())
+    data$ids <- append(data$ids, newId, after = idx)
+    insertUI(
+      selector = paste0("#", id),
+      ui = item_UI(newId),
+      where = "afterEnd"
+    )
+    item_Server(newId, data)
+  }
+  
+  
+  
+  observeEvent(input$add_button, {
+    data$add()
+  })
+  
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      paste("data", ".csv", sep = "")
+    },
+    content = function(file) {
+      df <- do.call(rbind, lapply(data$values, function(x) data.frame(as.list(x), stringsAsFactors = FALSE)))
+      write.csv(df, file, row.names = FALSE)
+    }
+  )
 }
+
+
 
 shinyApp(ui = ui, server = server)
