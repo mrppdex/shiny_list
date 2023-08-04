@@ -36,11 +36,11 @@ item_UI <- function(id) {
   )
 }
 
-item_Server <- function(id, data) {
+item_Server <- function(id, data, session) {
   print(data$ids)
   moduleServer(
-    id,
-    function(input, output, session) {
+    id = id,
+    module = function(input, output, session) {
       observeEvent(input$insert_above_button, {
         data$insertAbove(id)
       })
@@ -58,7 +58,8 @@ item_Server <- function(id, data) {
         print(data$values[[id]])
       })
       
-    }
+    },
+  session = session
   )
 }
 
@@ -82,7 +83,7 @@ server <- function(input, output, session) {
       ui = item_UI(id),
       where = "beforeBegin"
     )
-    item_Server(id, data)
+    item_Server(id, data, session)
   }
   
   data$insertAbove <- function(id) {
@@ -98,7 +99,7 @@ server <- function(input, output, session) {
       ui = item_UI(newId),
       where = "beforeBegin"
     )
-    item_Server(newId, data)
+    item_Server(newId, data, session)
   }
   
   data$insertBelow <- function(id) {
@@ -114,7 +115,7 @@ server <- function(input, output, session) {
       ui = item_UI(newId),
       where = "afterEnd"
     )
-    item_Server(newId, data)
+    item_Server(newId, data, session)
   }
   
   observeEvent(input$add_button, {
