@@ -6,7 +6,7 @@ item_UI <- function(id) {
     id = id,
     div(
       id = ns("item_container"),
-      style = "border: 1px solid; border-radius: 10px; background-color: #800080; padding: 10px; margin: 10px;", # purple fill, rounded corners
+      style = "border: 1px solid; border-radius: 10px; background-color: #800080; padding: 10px; margin: 10px; width: 20%; min-width: 500px;", # purple fill, rounded corners
       tagList(
         div(
           style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;", # flex container for arranging inputs in a row
@@ -30,19 +30,14 @@ item_UI <- function(id) {
           style = "display: flex; justify-content: flex-start; align-items: center; margin-bottom: 10px;", # flex container for arranging buttons in a row
           actionButton(ns("insert_above_button"), "Insert item above"),
           actionButton(ns("insert_below_button"), "Insert item below")
-        ),
-        tags$hr()
+        )
       )
     )
   )
 }
 
-
-
-
-
-# Module Server
 item_Server <- function(id, data) {
+  print(data$ids)
   moduleServer(
     id,
     function(input, output, session) {
@@ -60,18 +55,18 @@ item_Server <- function(id, data) {
           Lower = input$lower_bound_input,
           Upper = input$upper_bound_input
         )
+        print(data$values[[id]])
       })
+      
     }
   )
 }
 
-
-
-
 ui <- fluidPage(
   actionButton("add_button", "Add item"),
-  tags$div(id = "placeholder"),
-  downloadButton("downloadData", "Save to CSV")  # Add the 'Save to CSV' button here
+  actionButton("print_ids", "Print IDs"),  # Add a new button for printing IDs
+  downloadButton("downloadData", "Save to CSV"),
+  tags$div(id = "placeholder")
 )
 
 server <- function(input, output, session) {
@@ -122,8 +117,6 @@ server <- function(input, output, session) {
     item_Server(newId, data)
   }
   
-  
-  
   observeEvent(input$add_button, {
     data$add()
   })
@@ -137,8 +130,14 @@ server <- function(input, output, session) {
       write.csv(df, file, row.names = FALSE)
     }
   )
+  
+  observeEvent(input$print_ids, {
+    ids <- paste(data$ids, collapse = "\n")
+    showModal(modalDialog(
+      title = "IDs",
+      paste("Current IDs:\n\n", ids)
+    ))
+  })
 }
-
-
 
 shinyApp(ui = ui, server = server)
